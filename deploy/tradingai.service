@@ -1,0 +1,21 @@
+[Unit]
+Description=TradingAI Continuous Trading Runner
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tradingai
+Group=tradingai
+WorkingDirectory=/opt/TradingAI
+EnvironmentFile=/opt/TradingAI/.env
+ExecStart=/opt/TradingAI/.venv/bin/python -m src.runtime.runtime_harness --execution
+Restart=always
+RestartSec=15
+StartLimitInterval=300
+StartLimitBurst=3
+StandardOutput=append:/var/log/tradingai/runner.log
+StandardError=append:/var/log/tradingai/runner.log
+
+[Install]
+WantedBy=multi-user.target

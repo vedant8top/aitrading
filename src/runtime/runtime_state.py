@@ -25,6 +25,7 @@ class RuntimeState:
     def _init_db(self) -> None:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS runtime_state (
                 key TEXT PRIMARY KEY,
@@ -37,6 +38,7 @@ class RuntimeState:
 
     def set(self, key: str, value: str) -> None:
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL;")
         now = datetime.now(timezone.utc).isoformat()
         conn.execute(
             "INSERT OR REPLACE INTO runtime_state (key, value, updated_at) VALUES (?, ?, ?)",
@@ -47,6 +49,7 @@ class RuntimeState:
 
     def get(self, key: str) -> Optional[str]:
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL;")
         row = conn.execute("SELECT value FROM runtime_state WHERE key = ?", (key,)).fetchone()
         conn.close()
         return row[0] if row else None

@@ -34,6 +34,7 @@ class RunnerState:
         """Initialize SQLite database."""
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS runner_state (
                 key TEXT PRIMARY KEY,
@@ -59,6 +60,7 @@ class RunnerState:
     def set_state(self, key: str, value: str) -> None:
         """Set a state value."""
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL;")
         now = datetime.now(timezone.utc).isoformat()
         conn.execute(
             "INSERT OR REPLACE INTO runner_state (key, value, updated_at) VALUES (?, ?, ?)",
@@ -70,6 +72,7 @@ class RunnerState:
     def get_state(self, key: str) -> Optional[str]:
         """Get a state value."""
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL;")
         row = conn.execute("SELECT value FROM runner_state WHERE key = ?", (key,)).fetchone()
         conn.close()
         return row[0] if row else None
@@ -112,6 +115,7 @@ class RunnerState:
     def log_signal(self, symbol: str, signal: str, price: float, strategy: str = "") -> None:
         """Log a signal to the database."""
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL;")
         now = datetime.now(timezone.utc).isoformat()
         conn.execute(
             "INSERT INTO signal_log (symbol, signal, price, strategy, timestamp) VALUES (?, ?, ?, ?, ?)",
@@ -124,6 +128,7 @@ class RunnerState:
     def get_signal_history(self, limit: int = 100) -> list[dict]:
         """Get recent signal history."""
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL;")
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             "SELECT * FROM signal_log ORDER BY id DESC LIMIT ?", (limit,)

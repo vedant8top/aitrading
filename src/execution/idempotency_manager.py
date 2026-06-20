@@ -42,6 +42,7 @@ class IdempotencyManager:
     def _init_db(self) -> None:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS idempotency (
                 client_order_id TEXT PRIMARY KEY,
@@ -76,6 +77,7 @@ class IdempotencyManager:
         """Register a pending order before submission."""
         now = datetime.now(timezone.utc).isoformat()
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute(
             """INSERT OR REPLACE INTO idempotency
                (client_order_id, symbol, side, quantity, status, fingerprint, request_json, created_at, updated_at)
@@ -91,6 +93,7 @@ class IdempotencyManager:
         """Mark order as submitted after successful exchange submission."""
         now = datetime.now(timezone.utc).isoformat()
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute(
             "UPDATE idempotency SET status=?, order_id=?, updated_at=? WHERE client_order_id=?",
             (self.STATUS_SUBMITTED, order_id, now, client_order_id),
@@ -103,6 +106,7 @@ class IdempotencyManager:
         """Mark order as filled."""
         now = datetime.now(timezone.utc).isoformat()
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute(
             "UPDATE idempotency SET status=?, updated_at=? WHERE client_order_id=?",
             (self.STATUS_FILLED, now, client_order_id),
@@ -114,6 +118,7 @@ class IdempotencyManager:
         """Mark order as cancelled."""
         now = datetime.now(timezone.utc).isoformat()
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute(
             "UPDATE idempotency SET status=?, updated_at=? WHERE client_order_id=?",
             (self.STATUS_CANCELLED, now, client_order_id),
@@ -125,6 +130,7 @@ class IdempotencyManager:
         """Mark order as failed."""
         now = datetime.now(timezone.utc).isoformat()
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute(
             "UPDATE idempotency SET status=?, updated_at=? WHERE client_order_id=?",
             (self.STATUS_FAILED, now, client_order_id),
@@ -136,6 +142,7 @@ class IdempotencyManager:
     def is_duplicate(self, client_order_id: str) -> bool:
         """Check if a client_order_id already exists (duplicate detection)."""
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL;")
         row = conn.execute(
             "SELECT status FROM idempotency WHERE client_order_id=?",
             (client_order_id,),
@@ -149,6 +156,7 @@ class IdempotencyManager:
     def get_order(self, client_order_id: str) -> Optional[dict]:
         """Get idempotency record for a client_order_id."""
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL;")
         conn.row_factory = sqlite3.Row
         row = conn.execute(
             "SELECT * FROM idempotency WHERE client_order_id=?",
@@ -162,6 +170,7 @@ class IdempotencyManager:
     def get_pending_orders(self) -> list[dict]:
         """Get all orders in PENDING status (recovery candidates)."""
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL;")
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             "SELECT * FROM idempotency WHERE status=? ORDER BY created_at ASC",
@@ -173,6 +182,7 @@ class IdempotencyManager:
     def get_submitted_orders(self) -> list[dict]:
         """Get all orders in SUBMITTED status (check if filled)."""
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL;")
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             "SELECT * FROM idempotency WHERE status=? ORDER BY created_at ASC",
@@ -185,6 +195,7 @@ class IdempotencyManager:
         """Update exchange status for an idempotency record."""
         now = datetime.now(timezone.utc).isoformat()
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute(
             "UPDATE idempotency SET exchange_status=?, updated_at=? WHERE client_order_id=?",
             (exchange_status, now, client_order_id),
@@ -195,6 +206,7 @@ class IdempotencyManager:
     def get_summary(self) -> dict:
         """Get summary of all idempotency records."""
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL;")
         total = conn.execute("SELECT COUNT(*) FROM idempotency").fetchone()[0]
         pending = conn.execute("SELECT COUNT(*) FROM idempotency WHERE status=?", (self.STATUS_PENDING,)).fetchone()[0]
         submitted = conn.execute("SELECT COUNT(*) FROM idempotency WHERE status=?", (self.STATUS_SUBMITTED,)).fetchone()[0]

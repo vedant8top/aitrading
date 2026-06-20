@@ -35,6 +35,7 @@ class HeartbeatMonitor:
     def _init_db(self) -> None:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS heartbeats (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,6 +65,7 @@ class HeartbeatMonitor:
         memory = self._get_memory_mb()
 
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute(
             """INSERT INTO heartbeats (timestamp, status, cycle_number, memory_mb, uptime_seconds)
                VALUES (?, ?, ?, ?, ?)""",
@@ -88,6 +90,7 @@ class HeartbeatMonitor:
     def get_latest_heartbeat(self) -> Optional[dict]:
         """Get the most recent heartbeat."""
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL;")
         conn.row_factory = sqlite3.Row
         row = conn.execute(
             "SELECT * FROM heartbeats ORDER BY id DESC LIMIT 1"
@@ -100,6 +103,7 @@ class HeartbeatMonitor:
     def get_heartbeat_history(self, limit: int = 100) -> list[dict]:
         """Get recent heartbeat history."""
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL;")
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             "SELECT * FROM heartbeats ORDER BY id DESC LIMIT ?", (limit,)
