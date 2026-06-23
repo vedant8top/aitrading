@@ -32,12 +32,26 @@ print(f"  BTCUSDT LOT_SIZE: step={step_size}, min={min_qty}")
 # ======================================================================
 # TEST 1: Generate client_order_id
 # ======================================================================
-print("\n[Test 1] Generate unique client_order_id...")
-cid1 = idempotency.generate_client_order_id("BTCUSDT", "BUY", 0.0001, "test")
-cid2 = idempotency.generate_client_order_id("BTCUSDT", "BUY", 0.0001, "test")
+print("\n[Test 1] Generate deterministic client_order_id...")
+ts = 1700000000.0
+cid1 = idempotency.generate_client_order_id("BTCUSDT", "BUY", 0.0001, "test", ts)
+cid2 = idempotency.generate_client_order_id("BTCUSDT", "BUY", 0.0001, "test", ts)
 print(f"  client_order_id 1: {cid1}")
 print(f"  client_order_id 2: {cid2}")
-assert cid1 != cid2, "client_order_id collision"
+assert cid1 == cid2, "client_order_id must be deterministic"
+
+cid_diff_sym = idempotency.generate_client_order_id("ETHUSDT", "BUY", 0.0001, "test", ts)
+cid_diff_side = idempotency.generate_client_order_id("BTCUSDT", "SELL", 0.0001, "test", ts)
+cid_diff_qty = idempotency.generate_client_order_id("BTCUSDT", "BUY", 0.0002, "test", ts)
+cid_diff_strat = idempotency.generate_client_order_id("BTCUSDT", "BUY", 0.0001, "other", ts)
+cid_diff_ts = idempotency.generate_client_order_id("BTCUSDT", "BUY", 0.0001, "test", ts + 1)
+
+assert cid1 != cid_diff_sym, "Changing symbol must yield different ID"
+assert cid1 != cid_diff_side, "Changing side must yield different ID"
+assert cid1 != cid_diff_qty, "Changing quantity must yield different ID"
+assert cid1 != cid_diff_strat, "Changing strategy must yield different ID"
+assert cid1 != cid_diff_ts, "Changing timestamp must yield different ID"
+
 assert cid1.startswith("TA_"), f"Unexpected format: {cid1}"
 assert cid2.startswith("TA_"), f"Unexpected format: {cid2}"
 print("  PASS")
@@ -48,7 +62,7 @@ print("  PASS")
 print("\n[Test 2] Register pending order (simulate pre-submit)...")
 price = market.get_ticker_price("BTCUSDT")["price"]
 quantity = round(10.0 / price, 6)
-cid = idempotency.generate_client_order_id("BTCUSDT", "BUY", quantity, "idempotency_test")
+cid = idempotency.generate_client_order_id("BTCUSDT", "BUY", quantity, "idempotency_test", time.time())
 idempotency.register_pending(
     client_order_id=cid,
     symbol="BTCUSDT",
@@ -81,7 +95,7 @@ print("\n[Test 4] Submit real order with idempotency tracking...")
 qty = round(round(float(quantity) / float(step_size)) * float(step_size), 5)
 print(f"  Using quantity: {qty} (from {quantity}, step={step_size})")
 assert qty >= min_qty, f"Quantity {qty} below minimum {min_qty}"
-real_cid = idempotency.generate_client_order_id("BTCUSDT", "BUY", qty, "idempotency_live")
+real_cid = idempotency.generate_client_order_id("BTCUSDT", "BUY", qty, "idempotency_live", time.time())
 idempotency.register_pending(client_order_id=real_cid, symbol="BTCUSDT", side="BUY",
                              quantity=qty, fingerprint="real_order")
 # Submit using raw API with string quantity to avoid float precision issues

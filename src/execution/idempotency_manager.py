@@ -61,15 +61,14 @@ class IdempotencyManager:
         conn.commit()
         conn.close()
 
-    def generate_client_order_id(self, symbol: str, side: str, quantity: float, strategy: str = "") -> str:
-        """Generate a unique client_order_id from request fingerprint.
+    def generate_client_order_id(self, symbol: str, side: str, quantity: float, strategy: str = "", timestamp: int | float = 0) -> str:
+        """Generate a unique client_order_id deterministically from stable inputs.
 
-        Combines request parameters with a UUID for uniqueness.
+        Combines request parameters to ensure duplicate signals produce the exact same ID.
         """
-        raw = f"{symbol}_{side}_{quantity}_{strategy}_{time.time_ns()}"
-        fingerprint = hashlib.sha256(raw.encode()).hexdigest()[:16]
-        uid = uuid.uuid4().hex[:8]
-        client_order_id = f"TA_{fingerprint}_{uid}"
+        raw = f"{symbol}_{side}_{quantity}_{strategy}_{timestamp}"
+        fingerprint = hashlib.sha256(raw.encode()).hexdigest()[:24]
+        client_order_id = f"TA_{fingerprint}"
         return client_order_id
 
     def register_pending(self, client_order_id: str, symbol: str, side: str, quantity: float,
