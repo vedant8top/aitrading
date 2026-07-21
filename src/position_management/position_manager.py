@@ -146,20 +146,24 @@ class PositionManager:
     def unrealized_pnl(self, symbol: str) -> Optional[float]:
         """Calculate unrealized P&L for an open position."""
         pos = self.get_position(symbol)
-        if not pos:
-            return None
+        return self._calc_unrealized_pnl(pos) if pos else None
+
+    def _calc_unrealized_pnl(self, pos: dict) -> float:
+        """Helper to calculate unrealized P&L given a position dictionary."""
+        current_price = pos.get("current_price")
+        if current_price is None:
+            return 0.0
+
         if pos["side"] == "LONG":
-            return (pos.get("current_price", 0) - pos["avg_entry_price"]) * pos["quantity"]
+            return (current_price - pos["avg_entry_price"]) * pos["quantity"]
         else:
-            return (pos["avg_entry_price"] - pos.get("current_price", 0)) * pos["quantity"]
+            return (pos["avg_entry_price"] - current_price) * pos["quantity"]
 
     def total_unrealized_pnl(self) -> float:
         """Sum of all unrealized P&L."""
         total = 0.0
         for pos in self.get_open_positions():
-            pnl = self.unrealized_pnl(pos["symbol"])
-            if pnl is not None:
-                total += pnl
+            total += self._calc_unrealized_pnl(pos)
         return total
 
     def total_realized_pnl(self) -> float:
