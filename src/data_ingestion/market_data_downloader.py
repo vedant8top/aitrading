@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import json
 import logging
 import re
@@ -15,7 +16,6 @@ from typing import Sequence
 
 import pandas as pd
 import yfinance as yf
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG = PROJECT_ROOT / "configs" / "stocks.json"
@@ -145,7 +145,9 @@ class MarketDataDownloader:
         return normalized
 
     @staticmethod
-    def _parse_dates(start_date: str, end_date: str) -> tuple[pd.Timestamp, pd.Timestamp]:
+    def _parse_dates(
+        start_date: str, end_date: str
+    ) -> tuple[pd.Timestamp, pd.Timestamp]:
         try:
             start = pd.Timestamp(start_date)
             end = pd.Timestamp(end_date)
@@ -343,15 +345,19 @@ def write_markdown_report(
     )
 
     file_lines = "\n".join(f"- `{path}`" for path in files)
-    success_lines = "\n".join(
-        f"- `{result.ticker}`: {result.row_count} rows, "
-        f"{result.start_date} to {result.end_date}, "
-        f"{result.missing_values} missing values"
-        for result in successful
-    ) or "- None"
-    failure_lines = "\n".join(
-        f"- `{result.ticker}`: {result.error}" for result in failed
-    ) or "- None"
+    success_lines = (
+        "\n".join(
+            f"- `{result.ticker}`: {result.row_count} rows, "
+            f"{result.start_date} to {result.end_date}, "
+            f"{result.missing_values} missing values"
+            for result in successful
+        )
+        or "- None"
+    )
+    failure_lines = (
+        "\n".join(f"- `{result.ticker}`: {result.error}" for result in failed)
+        or "- None"
+    )
 
     report = f"""# Data Ingestion Report
 
@@ -422,10 +428,33 @@ def main() -> int:
             args.end,
             downloader.output_folder,
         )
-        results = [
-            downloader.download_ticker(ticker, args.start, args.end)
-            for ticker in tickers
-        ]
+
+        results = []
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(32, len(tickers) or 1)
+        ) as executor:
+            future_to_ticker = {
+                executor.submit(
+                    downloader.download_ticker, ticker, args.start, args.end
+                ): ticker
+                for ticker in tickers
+            }
+            for future in concurrent.futures.as_completed(future_to_ticker):
+                try:
+                    result = future.result()
+                    results.append(result)
+                except Exception as exc:
+                    ticker = future_to_ticker[future]
+                    logger.error("Ticker %s generated an exception: %s", ticker, exc)
+                    # We create a failed result to keep the same return format
+                    results.append(
+                        DownloadResult(
+                            ticker=ticker,
+                            status="failed",
+                            error=f"Unexpected error: {type(exc).__name__}: {exc}",
+                        )
+                    )
+
         write_summary(results, args.summary.resolve())
         write_markdown_report(
             results,
