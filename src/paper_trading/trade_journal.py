@@ -49,8 +49,6 @@ class TradeJournal:
 
     def get_summary(self) -> dict[str, Any]:
         """Get summary statistics from the trade journal."""
-        from datetime import datetime, date
-
         trades = self.portfolio.get_trade_history(days=10000)
         snapshot = self.portfolio.get_latest_snapshot()
 
