@@ -202,12 +202,16 @@ class DailyRunner:
 
             # Update position prices
             market_value = 0.0
+            prices_to_update = {}
             for pos in self.portfolio.get_open_positions():
                 ticker = pos["ticker"]
                 if ticker in close_lookup and date_str in close_lookup[ticker].index:
                     close_price = float(close_lookup[ticker].loc[date_str])
-                    self.portfolio.update_position_price(ticker, close_price)
+                    prices_to_update[ticker] = close_price
                     market_value += close_price * pos["shares"]
+
+            if prices_to_update:
+                self.portfolio.update_position_prices(prices_to_update)
 
             # Process events for this date
             daily_events = events.get(date_str, [])

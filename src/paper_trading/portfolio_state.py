@@ -216,6 +216,32 @@ class PortfolioState:
             )
             self._conn.commit()
 
+    def update_position_prices(self, prices: dict[str, float]) -> None:
+        """Update current market price and unrealized P&L for multiple positions in batch."""
+        if not prices:
+            return
+
+        cursor = self._conn.execute(
+            "SELECT * FROM positions WHERE status = 'OPEN'",
+        )
+
+        updates = []
+        now = _now()
+        for row in cursor.fetchall():
+            pos = dict(row)
+            ticker = pos["ticker"]
+            if ticker in prices:
+                price = prices[ticker]
+                unrealized = (price - pos["entry_price"]) * pos["shares"]
+                updates.append((price, round(unrealized, 2), now, pos["id"]))
+
+        if updates:
+            self._conn.executemany(
+                "UPDATE positions SET current_price = ?, unrealized_pnl = ?, updated_at = ? WHERE id = ?",
+                updates,
+            )
+            self._conn.commit()
+
     def get_open_positions(self) -> list[dict[str, Any]]:
         """Return all open positions."""
         cursor = self._conn.execute(
