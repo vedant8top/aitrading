@@ -161,10 +161,20 @@ class PositionManager:
 
     def total_unrealized_pnl(self) -> float:
         """Sum of all unrealized P&L."""
-        total = 0.0
-        for pos in self.get_open_positions():
-            total += self._calc_unrealized_pnl(pos)
-        return total
+        conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL;")
+        query = """
+            SELECT COALESCE(SUM(
+                CASE
+                    WHEN current_price IS NULL THEN 0.0
+                    WHEN side = 'LONG' THEN (current_price - avg_entry_price) * quantity
+                    ELSE (avg_entry_price - current_price) * quantity
+                END
+            ), 0.0) FROM open_positions
+        """
+        row = conn.execute(query).fetchone()
+        conn.close()
+        return row[0] if row else 0.0
 
     def total_realized_pnl(self) -> float:
         """Sum of all realized P&L."""
