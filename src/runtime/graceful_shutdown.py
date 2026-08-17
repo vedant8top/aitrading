@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import signal
 import sys
 from typing import Any, Callable, Optional
