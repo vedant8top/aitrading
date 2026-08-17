@@ -95,8 +95,15 @@ class DailyRunner:
             ticker = csv_path.stem
             if tickers and ticker not in tickers:
                 continue
-            df = pd.read_csv(csv_path, parse_dates=["Date"])
-            df = df.sort_values("Date").reset_index(drop=True)
+
+            cache_path = csv_path.with_suffix(".pkl")
+            if cache_path.exists() and cache_path.stat().st_mtime >= csv_path.stat().st_mtime:
+                df = pd.read_pickle(cache_path)
+            else:
+                df = pd.read_csv(csv_path, parse_dates=["Date"])
+                df = df.sort_values("Date").reset_index(drop=True)
+                df.to_pickle(cache_path)
+
             stocks[ticker] = df
 
         self.logger.info("Loaded %d stock files", len(stocks))
