@@ -208,7 +208,7 @@ class DonchianOptimizer:
                         total_return_pct=float(metrics.get("total_return_pct", 0)),
                         cagr_pct=float(metrics.get("cagr_pct", 0)),
                         sharpe_ratio=float(metrics.get("sharpe_ratio", 0)),
-                        max_drawdown_pct=float(metrics.get("max_drawdown_pct", 0)),
+                        max_drawdown_pct=float(metrics.get("maximum_drawdown_pct", 0)),
                         win_rate_pct=float(metrics.get("win_rate_pct", 0)),
                         total_trades=int(metrics.get("total_trades", 0)),
                         profit_factor=float(metrics.get("profit_factor", 0)),
