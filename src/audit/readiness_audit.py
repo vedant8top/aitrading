@@ -95,13 +95,21 @@ class ReadinessAudit:
         """Check 6: Exchange Layer — 15%"""
         env_path = PROJECT_ROOT / ".env"
         if env_path.exists():
-            content = env_path.read_text()
-            has_key = "BINANCE_API_KEY=PASTE_YOUR_API_KEY_HERE" not in content
-            has_secret = "BINANCE_SECRET_KEY=PASTE_YOUR_SECRET_KEY_HERE" not in content
-            if has_key and has_secret:
-                self._check("Exchange Layer", 15, True, "Binance credentials configured in .env")
-            else:
-                self._check("Exchange Layer", 15, False, "Binance credentials are placeholders — update .env")
+            try:
+                from dotenv import dotenv_values
+                env_vars = dotenv_values(env_path)
+                api_key = (env_vars.get("BINANCE_API_KEY") or "").strip()
+                secret_key = (env_vars.get("BINANCE_SECRET_KEY") or "").strip()
+
+                has_key = bool(api_key and api_key != "PASTE_YOUR_API_KEY_HERE")
+                has_secret = bool(secret_key and secret_key != "PASTE_YOUR_SECRET_KEY_HERE")
+
+                if has_key and has_secret:
+                    self._check("Exchange Layer", 15, True, "Binance credentials configured in .env")
+                else:
+                    self._check("Exchange Layer", 15, False, "Binance credentials missing or are placeholders — update .env")
+            except Exception as e:
+                self._check("Exchange Layer", 15, False, f"Failed to parse .env file: {e}")
         else:
             self._check("Exchange Layer", 15, False, ".env file not found")
 
