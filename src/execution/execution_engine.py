@@ -61,10 +61,9 @@ class ExecutionEngine:
     def _init_db(self) -> None:
         """Initialize SQLite execution log database."""
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(str(self.db_path))
-        conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute("""
+        self.conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
+        self.conn.execute("PRAGMA journal_mode=WAL;")
+        self.conn.execute("""
             CREATE TABLE IF NOT EXISTS execution_log (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 order_id TEXT,
@@ -81,17 +80,21 @@ class ExecutionEngine:
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        conn.commit()
-        conn.close()
+        self.conn.commit()
         logger.info("Execution log database initialized: %s", self.db_path)
+
+    def close(self) -> None:
+        """Close the database connection."""
+        if hasattr(self, 'conn') and self.conn:
+            self.conn.close()
+
+    def __del__(self) -> None:
+        self.close()
 
     def _persist_result(self, result: ExecutionResult) -> None:
         """Persist an ExecutionResult to SQLite."""
         try:
-            conn = sqlite3.connect(str(self.db_path))
-            conn.execute("PRAGMA journal_mode=WAL;")
-            conn.execute("PRAGMA journal_mode=WAL;")
-            conn.execute(
+            self.conn.execute(
                 """INSERT INTO execution_log
                    (order_id, symbol, side, quantity, price, status, strategy, timestamp, pnl, commission, raw_response)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -109,8 +112,7 @@ class ExecutionEngine:
                     json.dumps(result.raw_response) if result.raw_response else None,
                 ),
             )
-            conn.commit()
-            conn.close()
+            self.conn.commit()
             logger.info("Execution result persisted: order_id=%s", result.order_id)
         except Exception as e:
             logger.error("Failed to persist execution result: %s", e)
@@ -286,14 +288,14 @@ class ExecutionEngine:
     def get_execution_history(self, limit: int = 100) -> list[dict]:
         """Get recent execution history from SQLite."""
         try:
-            conn = sqlite3.connect(str(self.db_path))
-            conn.execute("PRAGMA journal_mode=WAL;")
-            conn.execute("PRAGMA journal_mode=WAL;")
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute(
+            # Temporarily set row_factory for this operation
+            original_row_factory = self.conn.row_factory
+            self.conn.row_factory = sqlite3.Row
+            rows = self.conn.execute(
                 "SELECT * FROM execution_log ORDER BY id DESC LIMIT ?", (limit,)
             ).fetchall()
-            conn.close()
+            # Restore row_factory
+            self.conn.row_factory = original_row_factory
             return [dict(row) for row in rows]
         except Exception as e:
             logger.error("Failed to get execution history: %s", e)
